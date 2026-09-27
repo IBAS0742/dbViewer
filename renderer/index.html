@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'">
+  <title>SQLite 数据图表浏览器</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header id="topbar">
+    <div class="brand">📊 数据图表浏览器</div>
+    <button id="btn-open" class="btn primary">打开 DB 文件</button>
+    <span id="file-name" class="muted">未打开数据库</span>
+    <label class="inline-label">数据表
+      <select id="table-select" disabled></select>
+    </label>
+    <span id="row-info" class="muted"></span>
+    <span class="spacer"></span>
+    <button id="btn-export-chart" class="btn" disabled>导出图表数据</button>
+    <button id="btn-export-full" class="btn" disabled>导出完整数据 (Excel)</button>
+    <button id="btn-export-csv" class="btn" disabled>导出完整数据 (CSV)</button>
+  </header>
+
+  <div id="layout">
+    <aside id="sidebar">
+      <div class="side-head">① 数据过滤 <span id="filter-count" class="pill"></span></div>
+      <input id="filter-search" placeholder="🔍 搜索字段…" />
+      <div class="side-actions">
+        <button id="btn-apply" class="btn primary grow">应用过滤并刷新</button>
+        <button id="btn-clear" class="btn">清除</button>
+      </div>
+      <div id="filter-form" class="side-body">
+        <div class="empty-hint">请先打开一个 .db 文件</div>
+      </div>
+    </aside>
+
+    <main id="main">
+      <section id="chart-panel">
+        <div id="chart-toolbar">
+          <span class="step-title">② 图表配置</span>
+          <label class="inline-label">预设图表
+            <select id="preset-select"><option value="">（自选配置）</option></select>
+          </label>
+          <label class="inline-label">图表类型
+            <select id="chart-type"></select>
+          </label>
+          <label class="inline-label">数据上限
+            <select id="sample-limit">
+              <option value="5000">5千行</option>
+              <option value="20000" selected>2万行</option>
+              <option value="50000">5万行</option>
+              <option value="100000">10万行</option>
+            </select>
+          </label>
+          <button id="btn-draw" class="btn primary" disabled>③ 绘制图表</button>
+          <span id="chart-msg" class="muted"></span>
+        </div>
+        <div id="chart-config"></div>
+        <div id="chart-wrap">
+          <div id="chart"></div>
+          <div id="chart-empty" class="empty-hint">选择图表类型并点击「绘制图表」</div>
+        </div>
+      </section>
+
+      <section id="table-panel">
+        <div class="panel-head">数据预览（前 100 行）<span id="preview-info" class="muted"></span></div>
+        <div id="data-table"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" hidden></div>
+  <div id="busy" hidden><div class="busy-box">处理中，请稍候…</div></div>
+
+  <script src="../node_modules/echarts/dist/echarts.min.js"></script>
+  <script src="../node_modules/echarts-gl/dist/echarts-gl.min.js"></script>
+  <script src="chart-builder.js"></script>
+  <script src="demo.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

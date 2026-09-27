@@ -1,0 +1,20 @@
+# 依赖
+node_modules/
+
+# 构建产物
+dist/
+.cache/
+
+# 测试截图
+shots/
+
+# 数据文件（体积大，不入库；如需提交可 git add -f small_range.db）
+*.db
+*.sqlite
+*.sqlite3
+
+# 系统文件
+Thumbs.db
+.DS_Store
+
+package-lock.json
