@@ -119,21 +119,18 @@ key 是数据库字段名，value 是显示名。未配置的字段显示原始�
 
 ## 自动打包与发布（GitHub Actions）
 
-仓库已配置 [.github/workflows/build.yml](.github/workflows/build.yml)：
+仓库已配置 [.github/workflows/build.yml](.github/workflows/build.yml)，**日常使用只需 `git push`，无需打标签**：
 
-- **push 到 `main`/`master`**：在 Windows / Linux / macOS 三个 runner 上分别打包，
-  产物上传为 Actions Artifacts（页面底部 Artifacts 区下载，保留 30 天），每次 push 都会跑；
-- **push 标签 `v*`**（如 `v1.0.0`）：三平台打包后自动创建 GitHub Release 并附上安装包；
+- **push 到 `main`**：三平台自动打包，并把安装包滚动更新到仓库
+  **Releases 页的「最新构建」**（每次推送替换上一份，直接下载即可）；
+- **push 标签 `v*`**（可选，用于正式版本）：额外创建一份正式版 Release；
 - **手动触发**：Actions 页面 → Build → Run workflow。
 
 ```bash
-# 日常更新：推上去即自动打包
-git push
-
-# 发版：打标签推送，几分钟后在 Release 页下载三平台安装包
-git tag v1.0.0
-git push origin v1.0.0
+git push          # 推上去即可，几分钟后到 Releases 页下载三平台安装包
 ```
+
+（tag 并不是分支，只是给某次提交起一个版本名；想留正式版本号时再用它即可。）
 
 产物对照：
 

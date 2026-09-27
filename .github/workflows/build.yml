@@ -1,7 +1,7 @@
 name: Build
 
-# push 到 main/master：三平台打包，产物存为 Actions Artifacts（供测试）
-# push 标签 v*：三平台打包并把安装包发布到 GitHub Release
+# push 到 main/master：三平台打包，并自动把安装包更新到 Release 页的「最新构建」
+# （不需要打标签，推上去就有）；push 标签 v* 额外生成一份正式版 Release。
 # 也可在 Actions 页面手动触发（workflow_dispatch）
 on:
   push:
@@ -12,6 +12,11 @@ on:
 
 permissions:
   contents: write
+
+# 连续推送时取消还在跑的旧构建，省时间
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -72,7 +77,8 @@ jobs:
 
   release:
     name: 发布 GitHub Release
-    if: startsWith(github.ref, 'refs/tags/v')
+    # main 推送 → 滚动更新「最新构建」；v* 标签 → 正式版 Release
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -82,7 +88,40 @@ jobs:
           merge-multiple: true
           path: release-assets
 
-      - name: 创建 Release
+      # 删除上一次的「最新构建」Release 及其 latest 标签（不存在则忽略）
+      - name: 清理旧的「最新构建」
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete latest --yes --cleanup-tag -R "$GITHUB_REPOSITORY" || true
+          gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/latest" || true
+
+      - name: 更新「最新构建」Release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: 最新构建（每次推送自动更新）
+          prerelease: true
+          files: release-assets/*
+          body: |
+            > 每次推送代码都会自动重新构建并替换本页的安装包，直接下载最新的即可。
+
+            | 平台 | 文件 | 说明 |
+            | --- | --- | --- |
+            | Windows | `*-win-x64.exe` / `*-win-x64.zip` | 安装版 / 便携版 |
+            | macOS | `*-mac-arm64.dmg` | Apple Silicon (M1/M2/M3/M4)，未签名 |
+            | macOS | `*-mac-x64.dmg` | Intel 芯片，未签名 |
+            | Linux | `*-linux-x86_64.AppImage` / `*-linux-amd64.deb` | 直接运行 / 安装 |
+
+            macOS 首次打开如提示「已损坏 / 无法验证开发者」：右键应用 → 打开，
+            或执行 `xattr -cr /Applications/数据图表浏览器.app`。
+
+            构建来源：commit ${{ github.sha }}
+
+      - name: 创建正式版 Release（仅 v* 标签）
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: release-assets/*
