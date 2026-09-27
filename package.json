@@ -3,7 +3,7 @@
   "productName": "数据图表浏览器",
   "version": "1.0.0",
   "description": "选择 SQLite db 文件 → 生成过滤表单 → 过滤/聚合数据 → ECharts 绘图 → 导出 Excel/CSV",
-  "author": { "name": "db-chart-explorer" },
+  "author": { "name": "db-chart-explorer", "email": "1091021117@qq.com" },
   "license": "MIT",
   "main": "main.js",
   "scripts": {
@@ -60,6 +60,8 @@
     },
     "linux": {
       "category": "Science",
+      "maintainer": "db-chart-explorer <1091021117@qq.com>",
+      "syncDesktopName": true,
       "target": [
         "AppImage",
         "deb"

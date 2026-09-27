@@ -43,6 +43,7 @@ jobs:
           restore-keys: ${{ runner.os }}-eb-
 
       - name: 安装依赖
+        shell: bash
         run: |
           if [ -f package-lock.json ]; then
             npm ci
