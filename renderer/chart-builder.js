@@ -26,11 +26,12 @@
   ];
 
   const AGGS = [
-    { value: 'count', name: '计数' },
-    { value: 'sum',   name: '求和' },
-    { value: 'avg',   name: '平均' },
-    { value: 'max',   name: '最大' },
-    { value: 'min',   name: '最小' }
+    { value: 'count',  name: '计数' },
+    { value: 'sum',    name: '求和' },
+    { value: 'avg',    name: '平均' },
+    { value: 'max',    name: '最大' },
+    { value: 'min',    name: '最小' },
+    { value: 'direct', name: '原值(数据已聚合)' }
   ];
 
   /* ---------------- 工具函数 ---------------- */
@@ -57,6 +58,8 @@
   }
 
   function axisTitleFor(cfg, lbl) {
+    // direct：数据在 SQL 里已聚合（查询视图），坐标轴直接用结果列名
+    if (cfg.agg === 'direct' && cfg.value) return lbl(cfg.value);
     if (!cfg.value || cfg.agg === 'count') return '数量';
     const names = { sum: '求和', avg: '平均', max: '最大', min: '最小' };
     return `${names[cfg.agg] || cfg.agg}(${lbl(cfg.value)})`;
@@ -141,7 +144,7 @@
     const val = a => {
       if (!a) return null;
       switch (cfg.agg) {
-        case 'sum': return a.n ? a.sum : null;
+        case 'sum': case 'direct': return a.n ? a.sum : null;
         case 'avg': return a.n ? a.sum / a.n : null;
         case 'max': return a.n ? a.max : null;
         case 'min': return a.n ? a.min : null;
@@ -293,8 +296,9 @@
         if (n !== null) { acc.n++; acc.sum += n; if (n < acc.min) acc.min = n; if (n > acc.max) acc.max = n; }
       }
     }
-    const pick = a => cfg.agg === 'sum' ? a.sum : cfg.agg === 'avg' ? (a.n ? a.sum / a.n : 0)
-      : cfg.agg === 'max' ? a.max : cfg.agg === 'min' ? a.min : a.count;
+    const pick = a => (cfg.agg === 'sum' || cfg.agg === 'direct') ? a.sum
+      : cfg.agg === 'avg' ? (a.n ? a.sum / a.n : 0)
+        : cfg.agg === 'max' ? a.max : cfg.agg === 'min' ? a.min : a.count;
     let data = nAxis.keys.map(k => ({ name: k, value: Math.round(pick(totals.get(k)) * 1e6) / 1e6 }))
       .filter(d => d.value > 0 || cfg.agg !== 'count')
       .sort((a, b) => b.value - a.value);
@@ -442,7 +446,7 @@
     const val2 = a => {
       if (!a) return null;
       switch (cfg.agg) {
-        case 'sum': return a.n ? a.sum : null;
+        case 'sum': case 'direct': return a.n ? a.sum : null;
         case 'avg': return a.n ? a.sum / a.n : null;
         case 'max': return a.n ? a.max : null;
         case 'min': return a.n ? a.min : null;

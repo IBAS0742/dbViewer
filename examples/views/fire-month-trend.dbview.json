@@ -1,0 +1,43 @@
+{
+  "format": "dbchart-query-view",
+  "version": 1,
+  "id": "fire-month-trend",
+  "name": "指定月份的历年火点趋势",
+  "description": "选择一个月份（必填），查看该月份在各个年份的火点数量与平均火点功率变化趋势。",
+  "author": "dbViewer 内置示例",
+  "params": [
+    {
+      "key": "month",
+      "label": "月份",
+      "type": "select",
+      "required": true,
+      "default": 8,
+      "options": [
+        { "value": 1, "label": "1月" },
+        { "value": 2, "label": "2月" },
+        { "value": 3, "label": "3月" },
+        { "value": 4, "label": "4月" },
+        { "value": 5, "label": "5月" },
+        { "value": 6, "label": "6月" },
+        { "value": 7, "label": "7月" },
+        { "value": 8, "label": "8月" },
+        { "value": 9, "label": "9月" },
+        { "value": 10, "label": "10月" },
+        { "value": 11, "label": "11月" },
+        { "value": 12, "label": "12月" }
+      ]
+    }
+  ],
+  "sql": "SELECT year AS \"年份\", COUNT(*) AS \"火点数量\", ROUND(AVG(FRP), 1) AS \"平均火点功率\" FROM fire WHERE month = :month GROUP BY year ORDER BY year",
+  "display": {
+    "columns": ["年份", "火点数量", "平均火点功率"],
+    "chart": {
+      "type": "line",
+      "x": "年份",
+      "y": "平均火点功率",
+      "agg": "direct",
+      "sort": "x-asc",
+      "title": "指定月份的历年平均火点功率"
+    }
+  }
+}

@@ -92,6 +92,38 @@ select:focus, input:focus { outline: 2px solid var(--accent-weak); border-color:
 .range-row span { color: var(--muted); }
 .empty-hint { color: var(--muted); text-align: center; padding: 30px 10px; }
 
+/* ---------- 查询视图（导入式过滤 SQL） ---------- */
+#view-panel {
+  flex: 1; overflow-y: auto;
+  padding: 8px 10px 20px;
+  display: flex; flex-direction: column;
+}
+body:not(.view-mode) #view-panel { display: none; }
+body.view-mode #filter-search,
+body.view-mode #filter-actions,
+body.view-mode #filter-form { display: none; }
+.side-head .spacer { flex: 1; }
+#btn-exit-view, #btn-save-view { padding: 1px 8px; font-size: 11px; }
+body:not(.view-mode) #btn-exit-view { display: none; }
+.view-head { padding: 2px 2px 0; }
+.view-name { font-weight: 700; font-size: 13px; color: var(--accent); word-break: break-all; }
+.view-desc { color: var(--muted); font-size: 12px; padding: 2px 2px 6px; line-height: 1.5; }
+.vparam { display: flex; flex-direction: column; gap: 3px; padding: 6px 2px; border-bottom: 1px dashed var(--border); }
+.vparam > label { font-weight: 600; font-size: 12px; }
+.vparam .hint { color: var(--muted); font-weight: 400; font-size: 11px; }
+.vparam .req { color: var(--danger); }
+.vparam .help { color: var(--muted); font-size: 11px; font-weight: 400; }
+.vparam input, .vparam select { width: 100%; }
+.vparam .chips { max-height: 120px; }
+#view-sql-box { margin-top: 10px; font-size: 12px; }
+#view-sql-box summary { cursor: pointer; color: var(--muted); user-select: none; }
+#view-sql {
+  background: #f8fafc; border: 1px solid var(--border); border-radius: 6px;
+  padding: 8px; margin: 6px 0 0;
+  font-family: Consolas, "Courier New", monospace; font-size: 11px; line-height: 1.5;
+  white-space: pre-wrap; word-break: break-all; max-height: 220px; overflow: auto;
+}
+
 /* ---------- 主区 ---------- */
 #main { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 10px; gap: 10px; }
 #chart-panel {
@@ -115,6 +147,131 @@ select:focus, input:focus { outline: 2px solid var(--accent-weak); border-color:
   pointer-events: none;
 }
 #chart-empty.hidden { display: none; }
+
+/* ---------- 折叠按钮 ---------- */
+.fold-btn {
+  flex: 0 0 auto; width: 22px; height: 22px; line-height: 1; padding: 0;
+  border: 1px solid var(--border); border-radius: 6px; background: #fff;
+  color: var(--muted); font-size: 12px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.fold-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ---------- 侧栏折叠 ---------- */
+#sidebar { transition: none; }
+#sidebar .side-head, #sidebar #filter-search, #sidebar .side-actions,
+#sidebar #view-panel, #sidebar #filter-form {
+  transition: none;
+}
+body.side-collapsed #sidebar { border-right: none; flex-basis: 16px; width: 16px; min-width: 16px; max-width: 16px; }
+body.side-collapsed #sidebar .side-head,
+body.side-collapsed #sidebar #filter-search,
+body.side-collapsed #sidebar .side-actions,
+body.side-collapsed #sidebar #view-panel,
+body.side-collapsed #sidebar #filter-form { display: none !important; }
+/* 折叠恢复条：始终渲染，避免二次展开时布局跳动 */
+#side-flap {
+  display: none;
+  position: fixed; left: 0; top: 0; bottom: 0; width: 16px; z-index: 30;
+  border-right: 1px solid var(--border); background: var(--panel);
+  cursor: pointer;
+}
+#side-flap:hover { background: var(--accent-weak); }
+#side-flap span {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  font-size: 14px; color: var(--muted);
+}
+body.side-collapsed #side-flap { display: block; }
+
+/* ---------- 数据预览折叠 ---------- */
+#data-table { transition: none; }
+body.table-collapsed #table-panel { flex: 0 0 auto; }
+body.table-collapsed #table-panel #data-table { display: none !important; }
+/* 折叠态下给面板一个最小可点高度，防止 flex 压成 0 找不到展开按钮 */
+body.table-collapsed #table-panel { min-height: 34px; }
+
+/* ---------- 图表全屏覆盖层 ---------- */
+#chart-full {
+  position: fixed; inset: 0; z-index: 60;
+  background: var(--panel);
+  display: flex; flex-direction: column;
+}
+#chart-full[hidden] { display: none; }
+.full-head {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px; border-bottom: 1px solid var(--border);
+}
+.full-title { font-weight: 700; font-size: 14px; }
+#full-wrap { flex: 1; position: relative; min-height: 0; }
+#full-chart { position: absolute; inset: 14px; }
+
+/* ---------- 导出图片菜单 ---------- */
+#export-menu {
+  position: fixed; inset: 0; z-index: 70;
+  background: rgba(15, 23, 42, .35);
+  display: flex; align-items: center; justify-content: center;
+}
+#export-menu[hidden] { display: none; }
+.menu-box {
+  background: #fff; border-radius: 10px; padding: 14px 18px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.2); min-width: 360px;
+}
+.menu-title { font-weight: 700; margin-bottom: 10px; }
+.menu-opt { display: flex; align-items: center; gap: 8px; padding: 5px 0; cursor: pointer; }
+.menu-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; align-items: center; }
+
+/* ---------- 我的配置 / 粘贴导入 / AI 提示词 弹窗 ---------- */
+#views-modal, #paste-modal, #ai-modal {
+  position: fixed; inset: 0; z-index: 70;
+  background: rgba(15, 23, 42, .35);
+  display: flex; align-items: center; justify-content: center;
+}
+#paste-modal, #ai-modal { z-index: 80; }
+#views-modal[hidden], #paste-modal[hidden], #ai-modal[hidden] { display: none; }
+.menu-wide { width: 560px; max-width: 92vw; max-height: 84vh; overflow-y: auto; }
+.menu-xwide { width: 760px; max-width: 94vw; max-height: 86vh; overflow-y: auto; }
+.menu-tip { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 4px 0 10px; }
+
+/* ---------- 我的配置列表 ---------- */
+.views-list { display: flex; flex-direction: column; gap: 6px; min-height: 40px; }
+.view-item {
+  border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+  display: flex; align-items: center; gap: 10px; background: #fff;
+}
+.view-item.current { border-color: var(--accent); background: var(--accent-weak); }
+.vi-main { flex: 1; min-width: 0; }
+.vi-name { font-weight: 700; font-size: 13px; }
+.vi-meta { color: var(--muted); font-size: 11px; margin-top: 2px; word-break: break-all; }
+.view-item .btn { flex: 0 0 auto; }
+.views-empty { color: var(--muted); text-align: center; padding: 18px 0; font-size: 12px; }
+
+/* ---------- 粘贴导入 ---------- */
+.paste-area {
+  width: 100%; height: 260px; resize: vertical;
+  border: 1px solid var(--border); border-radius: 8px; padding: 10px;
+  font-family: Consolas, "Courier New", monospace; font-size: 12px; line-height: 1.5;
+}
+.paste-area:focus { outline: 2px solid var(--accent-weak); border-color: var(--accent); }
+.paste-err {
+  background: #fef2f2; border: 1px solid #fecaca; color: var(--danger);
+  border-radius: 6px; padding: 8px 10px; font-size: 12px; margin-top: 8px;
+  white-space: pre-wrap; word-break: break-all;
+}
+
+/* ---------- AI 提示词 ---------- */
+.ai-tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+.ai-tab {
+  border: 1px solid var(--border); background: #fff; border-radius: 6px;
+  padding: 5px 12px; font-size: 12px; cursor: pointer; color: var(--muted);
+}
+.ai-tab.on { border-color: var(--accent); color: var(--accent); background: var(--accent-weak); font-weight: 600; }
+.ai-prompt {
+  background: #f8fafc; border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px; margin: 0 0 4px;
+  font-family: Consolas, "Courier New", monospace; font-size: 12px; line-height: 1.55;
+  white-space: pre-wrap; word-break: break-word;
+  max-height: 46vh; overflow-y: auto; user-select: all;
+}
 
 /* ---------- 数据预览 ---------- */
 #table-panel {

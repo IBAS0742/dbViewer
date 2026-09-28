@@ -1,0 +1,40 @@
+{
+  "format": "dbchart-query-view",
+  "version": 1,
+  "id": "fire-year-month",
+  "name": "指定年份区间的各月火点统计",
+  "description": "选择起止年份，统计该区间内每个月的火点数量并以柱状图展示。两个参数都可以留空，留空表示不限制。",
+  "author": "dbViewer 内置示例",
+  "params": [
+    {
+      "key": "year_from",
+      "label": "开始年份",
+      "type": "number",
+      "min": 2000,
+      "max": 2026,
+      "placeholder": "如 2015",
+      "help": "留空表示不限制"
+    },
+    {
+      "key": "year_to",
+      "label": "结束年份",
+      "type": "number",
+      "min": 2000,
+      "max": 2026,
+      "default": 2020,
+      "placeholder": "如 2020"
+    }
+  ],
+  "sql": "SELECT month AS \"月份\", COUNT(*) AS \"火点数量\" FROM fire WHERE (:year_from IS NULL OR year >= :year_from) AND (:year_to IS NULL OR year <= :year_to) GROUP BY month ORDER BY month",
+  "display": {
+    "columns": ["月份", "火点数量"],
+    "chart": {
+      "type": "bar",
+      "x": "月份",
+      "y": "火点数量",
+      "agg": "direct",
+      "sort": "x-asc",
+      "title": "各月火点数量（指定年份区间）"
+    }
+  }
+}

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'">
+        content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'">
   <title>SQLite 数据图表浏览器</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="style.css">
@@ -12,6 +12,8 @@
   <header id="topbar">
     <div class="brand">📊 数据图表浏览器</div>
     <button id="btn-open" class="btn primary">打开 DB 文件</button>
+    <button id="btn-import-view" class="btn" title="从 .view.json 文件导入图表配置（内置查询 SQL + 参数表单 + 图表显示逻辑）">导入配置</button>
+    <button id="btn-my-views" class="btn" title="管理已保存的图表配置：应用 / 导出 / 删除；也可粘贴 AI 生成的配置或获取 AI 提示词">我的配置</button>
     <span id="file-name" class="muted">未打开数据库</span>
     <label class="inline-label">数据表
       <select id="table-select" disabled></select>
@@ -25,12 +27,35 @@
 
   <div id="layout">
     <aside id="sidebar">
-      <div class="side-head">① 数据过滤 <span id="filter-count" class="pill"></span></div>
+      <div class="side-head">
+        <button id="btn-toggle-sidebar" class="fold-btn" title="折叠/展开侧栏，把中间区域让给图表" aria-expanded="true">‹</button>
+        <span id="side-title">① 数据过滤</span>
+        <span id="filter-count" class="pill"></span>
+        <span class="spacer"></span>
+        <button id="btn-save-view" class="btn" hidden title="把当前配置（查询 SQL + 参数 + 图表）保存到「我的配置」，重启后可复用">保存为配置</button>
+        <button id="btn-exit-view" class="btn" hidden title="退出视图模式，回到常规过滤">退出视图</button>
+      </div>
       <input id="filter-search" placeholder="🔍 搜索字段…" />
-      <div class="side-actions">
+      <div class="side-actions" id="filter-actions">
         <button id="btn-apply" class="btn primary grow">应用过滤并刷新</button>
         <button id="btn-clear" class="btn">清除</button>
       </div>
+
+      <div id="view-panel" hidden>
+        <div class="view-head">
+          <span class="view-name" id="view-title"></span>
+        </div>
+        <div class="view-desc" id="view-desc"></div>
+        <div id="view-params"></div>
+        <div class="side-actions">
+          <button id="btn-run-view" class="btn primary grow">▶ 运行查询</button>
+        </div>
+        <details id="view-sql-box">
+          <summary>查看本视图的 SQL</summary>
+          <pre id="view-sql"></pre>
+        </details>
+      </div>
+
       <div id="filter-form" class="side-body">
         <div class="empty-hint">请先打开一个 .db 文件</div>
       </div>
@@ -54,8 +79,11 @@
               <option value="100000">10万行</option>
             </select>
           </label>
-          <button id="btn-draw" class="btn primary" disabled>③ 绘制图表</button>
-          <span id="chart-msg" class="muted"></span>
+        <button id="btn-draw" class="btn primary" disabled>③ 绘制图表</button>
+        <span id="chart-msg" class="muted"></span>
+        <span class="spacer"></span>
+        <button id="btn-fullscreen" class="btn" title="全屏显示图表，隐藏侧栏与配置（Esc 或再点一次退出）">⛶ 全屏</button>
+        <button id="btn-export-image" class="btn" disabled title="把当前图表保存为图片，可选择全屏大图或面板小图两种尺寸">🖼 导出图片</button>
         </div>
         <div id="chart-config"></div>
         <div id="chart-wrap">
@@ -65,18 +93,95 @@
       </section>
 
       <section id="table-panel">
-        <div class="panel-head">数据预览（前 100 行）<span id="preview-info" class="muted"></span></div>
+        <div class="panel-head">
+          <button id="btn-toggle-table" class="fold-btn" title="折叠/展开数据预览，把空间让给图表" aria-expanded="true">▾</button>
+          数据预览（前 100 行）<span id="preview-info" class="muted"></span>
+        </div>
         <div id="data-table"></div>
       </section>
     </main>
   </div>
 
+  <div id="side-flap" title="展开侧栏"><span>›</span></div>
+
   <div id="toast" hidden></div>
   <div id="busy" hidden><div class="busy-box">处理中，请稍候…</div></div>
+
+  <!-- 图表全屏覆盖层：只放图表本体，退出时 canvas 归位到 #chart-wrap -->
+  <div id="chart-full" hidden>
+    <div class="full-head">
+      <span id="full-title" class="full-title"></span>
+      <span class="spacer"></span>
+      <button id="btn-full-exit" class="btn">✕ 退出全屏 (Esc)</button>
+    </div>
+    <div id="full-wrap"><div id="full-chart"></div></div>
+  </div>
+
+  <!-- 导出图片菜单：勾选导出尺寸 -->
+  <div id="export-menu" hidden>
+    <div class="menu-box">
+      <div class="menu-title">导出图表图片</div>
+      <label class="menu-opt"><input type="radio" name="export-size" value="panel" checked> 面板尺寸（与界面中显示一致）</label>
+      <label class="menu-opt"><input type="radio" name="export-size" value="fullscreen"> 全屏模式尺寸（更大更清晰，同全屏显示效果）</label>
+      <div class="menu-actions">
+        <button id="btn-export-image-ok" class="btn primary">导出</button>
+        <button id="btn-export-image-cancel" class="btn">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 我的配置：已保存图表配置的管理列表 -->
+  <div id="views-modal" hidden>
+    <div class="menu-box menu-wide">
+      <div class="menu-title">我的图表配置</div>
+      <div class="menu-tip">配置 = 查询 SQL + 参数表单 + 图表显示逻辑。导入或 AI 生成后自动保存在这里，重启应用后可继续复用；同名导入会覆盖更新。</div>
+      <div id="views-list" class="views-list"></div>
+      <div class="menu-actions">
+        <button id="btn-view-paste" class="btn" title="把 AI 生成的配置 JSON 粘贴进来导入">📋 粘贴导入</button>
+        <button id="btn-view-ai" class="btn" title="获取让 AI 生成配置的提示词（自动带上当前表结构）">🤖 AI 生成配置</button>
+        <span class="spacer"></span>
+        <button id="btn-views-close" class="btn">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 粘贴导入：直接吃 AI 输出的 JSON -->
+  <div id="paste-modal" hidden>
+    <div class="menu-box menu-wide">
+      <div class="menu-title">粘贴导入图表配置</div>
+      <div class="menu-tip">把 AI 生成的配置 JSON（或 .view.json 文件内容）粘贴到下面。校验通过后自动保存到「我的配置」并运行。</div>
+      <textarea id="paste-area" class="paste-area" placeholder='{"format":"dbchart-query-view","version":1,"name":"我的图表",...}'></textarea>
+      <div id="paste-err" class="paste-err" hidden></div>
+      <div class="menu-actions">
+        <button id="btn-paste-ok" class="btn primary">导入并保存</button>
+        <button id="btn-paste-cancel" class="btn">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI 提示词生成器 -->
+  <div id="ai-modal" hidden>
+    <div class="menu-box menu-xwide">
+      <div class="menu-title">让 AI 帮你生成图表配置</div>
+      <div class="ai-tabs">
+        <button id="ai-tab-a" class="ai-tab on" type="button">方式一：描述需求直接生成</button>
+        <button id="ai-tab-b" class="ai-tab" type="button">方式二：让 AI 先向我提问</button>
+      </div>
+      <div class="menu-tip" id="ai-tip"></div>
+      <pre id="ai-prompt" class="ai-prompt"></pre>
+      <div class="menu-actions">
+        <button id="btn-ai-copy" class="btn primary">复制提示词</button>
+        <span id="ai-copy-hint" class="muted"></span>
+        <span class="spacer"></span>
+        <button id="btn-ai-close" class="btn">关闭</button>
+      </div>
+    </div>
+  </div>
 
   <script src="../node_modules/echarts/dist/echarts.min.js"></script>
   <script src="../node_modules/echarts-gl/dist/echarts-gl.min.js"></script>
   <script src="chart-builder.js"></script>
+  <script src="../lib/query-view.js"></script>
   <script src="demo.js"></script>
   <script src="app.js"></script>
 </body>

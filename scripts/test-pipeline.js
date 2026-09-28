@@ -19,6 +19,32 @@ function check(name, cond, extra) {
 }
 
 (async () => {
+  console.log('== 0. 查询视图纯逻辑（不依赖数据文件） ==');
+  const QueryView = require('../lib/query-view');
+  check('扫描器忽略字符串里的冒号', JSON.stringify(QueryView.extractParamNames("SELECT '12:30' AS t, :a FROM x")) === JSON.stringify(['a']),
+    JSON.stringify(QueryView.extractParamNames("SELECT '12:30' AS t, :a FROM x")));
+  check('扫描器忽略注释里的参数', JSON.stringify(QueryView.extractParamNames('-- :b 注释\n/* :c */ SELECT :a FROM x')) === JSON.stringify(['a']));
+  check('多语句检测', QueryView.hasMultipleStatements('SELECT 1; SELECT 2') === true && QueryView.hasMultipleStatements('SELECT 1;') === false);
+  check('只读校验', QueryView.isReadOnlySelect('DELETE FROM t') === false && QueryView.isReadOnlySelect('WITH t AS (SELECT 1) SELECT * FROM t') === true);
+  const b1 = QueryView.buildViewSql('SELECT * FROM t WHERE a = :x AND b IN (:list)', { x: 1, list: ['p', 'q'] });
+  check('数组参数展开为 IN 列表', b1.sql === 'SELECT * FROM t WHERE a = ? AND b IN (?,?)' && JSON.stringify(b1.params) === JSON.stringify([1, 'p', 'q']), b1.sql);
+  const b2 = QueryView.buildViewSql('SELECT * FROM t WHERE a = :x', { x: null });
+  check('空参数绑定为 NULL', b2.params.length === 1 && b2.params[0] === null);
+  const b3 = QueryView.buildViewSql('SELECT * FROM t WHERE a = :x AND b = :x', { x: 5 });
+  check('同名参数多处出现', b3.params.length === 2);
+  let threw = false;
+  try { QueryView.buildViewSql('SELECT * FROM t WHERE a = :nope', {}); } catch (_) { threw = true; }
+  check('未提供的参数报错', threw);
+  check('追加 LIMIT', QueryView.appendLimit('SELECT * FROM t', 100) === 'SELECT * FROM t LIMIT 100');
+  check('自带 LIMIT/OFFSET 不重复追加', QueryView.appendLimit('SELECT * FROM t LIMIT 10 OFFSET 5', 100) === 'SELECT * FROM t LIMIT 10 OFFSET 5');
+  const badSpec = QueryView.validateViewSpec(
+    { format: 'dbchart-query-view', version: 1, name: 'x', sql: 'SELECT * FROM t WHERE a = :missing' }, {});
+  check('SQL 参数未定义被拒绝', !badSpec.ok && badSpec.errors.some(e => e.includes(':missing')));
+  const badChart = QueryView.validateViewSpec(
+    { format: 'dbchart-query-view', version: 1, name: 'x', sql: 'SELECT 1', display: { chart: { type: 'nope' } } },
+    { chartTypes: ChartBuilder.CHART_TYPES });
+  check('未知图表类型被拒绝', !badChart.ok);
+
   if (!fs.existsSync(DB)) {
     // CI 环境通常不含 73MB 的数据文件，此时只验证模块可加载
     require('../renderer/chart-builder');
@@ -96,6 +122,38 @@ function check(name, cond, extra) {
     if (ok && p.type === 'heatmap') {
       const sum = res.chartData.rows.reduce((s, r) => s + r.value, 0);
       check(`  热力图计数守恒(≤行数)`, sum <= rws.length, `聚合合计 ${sum} / 行 ${rws.length}`);
+    }
+  }
+
+  console.log('== 4.5 查询视图连库管道（examples/views） ==');
+  const viewsDir = path.join(__dirname, '..', 'examples', 'views');
+  const viewFiles = fs.readdirSync(viewsDir).filter(f => f.endsWith('.json'));
+  check('示例视图文件存在', viewFiles.length >= 3, viewFiles.join(', '));
+  for (const f of viewFiles) {
+    const raw = JSON.parse(fs.readFileSync(path.join(viewsDir, f), 'utf8'));
+    const v = QueryView.validateViewSpec(raw, { chartTypes: ChartBuilder.CHART_TYPES });
+    if (!v.ok) { check(`${f} 规范校验`, false, v.errors.join('；')); continue; }
+    const spec = v.spec;
+    const built = QueryView.buildViewSql(spec.sql, QueryView.defaultParamValues(spec));
+    let vtotal = 0, vrows = [], colNames = [];
+    try {
+      vtotal = qOne(db, QueryView.countWrap(built.sql), built.params).c;
+      vrows = qAll(db, QueryView.appendLimit(built.sql, 500), built.params);
+      colNames = vrows[0] ? Object.keys(vrows[0]) : [];
+    } catch (err) {
+      check(`${spec.name} 查询执行`, false, err.message);
+      continue;
+    }
+    check(`${spec.name} 默认参数能查出数据`, vtotal > 0 && vrows.length > 0, `${vtotal} 行`);
+    if (spec.display && spec.display.columns) {
+      const missing = spec.display.columns.filter(c => !colNames.includes(c.key));
+      check(`${spec.name} 展示列都在结果集中`, missing.length === 0, missing.map(c => c.key).join(','));
+    }
+    if (spec.display && spec.display.chart) {
+      const kinds = Object.fromEntries(QueryView.inferResultColumns(colNames, vrows).map(c => [c.name, c.kind]));
+      const out = ChartBuilder.build(spec.display.chart.type, spec.display.chart, vrows, { lbl, kind: c => kinds[c] || 'string' });
+      check(`${spec.name} 图表能构建`, !out.error && out.chartData && out.chartData.rows.length > 0,
+        out.error || `图上 ${out.chartData.rows.length} 条`);
     }
   }
 

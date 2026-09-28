@@ -111,6 +111,65 @@
     ]
   };
 
+  /* ---------- 查询视图支持：浏览器里用 sql.js 构建内存库，完整走一遍视图 SQL ---------- */
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('脚本加载失败: ' + src));
+      document.head.appendChild(s);
+    });
+  }
+
+  let demoDb = null;
+  async function ensureDemoDb() {
+    if (demoDb) return demoDb;
+    await loadScript('../node_modules/sql.js/dist/sql-wasm.js');
+    const SQL = await window.initSqlJs({ locateFile: f => '../node_modules/sql.js/dist/' + f });
+    demoDb = new SQL.Database();
+    demoDb.run(`CREATE TABLE fire (${COLS.map(c => `"${c.name}" ${c.declType || 'TEXT'}`).join(',')})`);
+    const placeholders = `(${COLS.map(() => '?').join(',')})`;
+    for (let i = 0; i < rows.length; i += 500) {
+      const chunk = rows.slice(i, i + 500);
+      demoDb.run(
+        `INSERT INTO fire VALUES ${chunk.map(() => placeholders).join(',')}`,
+        chunk.flatMap(r => COLS.map(c => r[c.name]))
+      );
+    }
+    return demoDb;
+  }
+
+  function qAll(db, sql, params = []) {
+    const stmt = db.prepare(sql);
+    try {
+      stmt.bind(params);
+      const out = [];
+      while (stmt.step()) out.push(stmt.getAsObject());
+      return out;
+    } finally {
+      stmt.free();
+    }
+  }
+  function qOne(db, sql, params = []) { return qAll(db, sql, params)[0] || null; }
+
+  async function demoRunView(args) {
+    try {
+      const db = await ensureDemoDb();
+      const built = QueryView.buildViewSql(args.sql, args.params || {});
+      const cap = Math.min(Math.max(Number(args.limit) || 20000, 1), 100000);
+      const lsql = QueryView.appendLimit(built.sql, cap);
+      const total = qOne(db, QueryView.countWrap(built.sql), built.params).c;
+      const out = qAll(db, lsql, built.params);
+      let columns = out[0] ? Object.keys(out[0]) : [];
+      const stmt = db.prepare(lsql);
+      try { if (stmt.getColumnNames) columns = stmt.getColumnNames(); } catch (_) { /* 首行 key 兜底 */ } finally { stmt.free(); }
+      return { total, rows: out, columns, limited: total > out.length };
+    } catch (err) {
+      return { error: err.message };
+    }
+  }
+
   window.api = {
     demo: true,
     async loadConfig() {
@@ -128,8 +187,11 @@
       const limit = Math.min(Number(args.limit) || 20000, 100000);
       return { total: out.length, rows: out.slice(0, limit), limited: out.length > limit };
     },
+    async queryView(args) { return demoRunView(args); },
+    async exportView() { return { ok: false, error: '演示模式不支持导出' }; },
     async exportFull() { return { ok: false, error: '演示模式不支持导出' }; },
     async exportSheets() { return { ok: false, error: '演示模式不支持导出' }; },
-    async pickDbFile() { return { canceled: true }; }
+    async pickDbFile() { return { canceled: true }; },
+    async pickViewFile() { return { canceled: true }; }
   };
 })();

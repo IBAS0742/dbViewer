@@ -1,0 +1,50 @@
+{
+  "format": "dbchart-query-view",
+  "version": 1,
+  "id": "fire-satellite-detail",
+  "name": "按卫星/海拔筛选火点明细",
+  "description": "多选卫星、指定最低海拔、按传感器关键字筛选火点明细记录，预览只展示发布者挑选的字段，并绘制海拔-功率散点图。所有参数留空即查看全部。",
+  "author": "dbViewer 内置示例",
+  "params": [
+    {
+      "key": "satellites",
+      "label": "卫星",
+      "type": "select",
+      "multiple": true,
+      "options": ["Aqua", "Terra"],
+      "help": "不勾选表示全部卫星"
+    },
+    {
+      "key": "elevation_min",
+      "label": "最低海拔(米)",
+      "type": "number",
+      "min": 0,
+      "max": 9000,
+      "placeholder": "如 3000",
+      "help": "留空表示不限制"
+    },
+    {
+      "key": "keyword",
+      "label": "传感器包含关键字",
+      "type": "text",
+      "placeholder": "如 MODIS",
+      "help": "对 INSTRUMENT 字段做包含匹配，留空表示不限制"
+    }
+  ],
+  "sql": "SELECT ACQ_DATE AS \"获取日期\", SATELLITE AS \"卫星\", CONFIDENCE AS \"置信度\", ROUND(FRP, 1) AS \"火点功率\", elevation AS \"海拔\" FROM fire WHERE (:satellites IS NULL OR SATELLITE IN (:satellites)) AND (:elevation_min IS NULL OR elevation >= :elevation_min) AND (:keyword IS NULL OR INSTRUMENT LIKE '%' || :keyword || '%') ORDER BY ACQ_DATE",
+  "display": {
+    "columns": [
+      { "key": "获取日期" },
+      { "key": "卫星" },
+      { "key": "置信度" },
+      { "key": "火点功率" },
+      { "key": "海拔" }
+    ],
+    "chart": {
+      "type": "scatter",
+      "x": "海拔",
+      "y": "火点功率",
+      "title": "海拔 × 火点功率（当前筛选结果）"
+    }
+  }
+}
